@@ -23,6 +23,12 @@
 - [Migration Approach](#migration-approach)
   - [Migration Timeline](#migration-timeline)
   - [Migration Workflow](#migration-workflow)
+- [Automated Migration: Beautiful Soup + Kroki Pipeline](#automated-migration-beautiful-soup--kroki-pipeline)
+  - [Pipeline Architecture](#pipeline-architecture)
+  - [Diagram Rendering Tools Comparison](#diagram-rendering-tools-comparison)
+  - [Python Migration Script](#python-migration-script)
+  - [Kroki Self-Hosted Setup](#kroki-self-hosted-setup)
+  - [Running the Pipeline](#running-the-pipeline)
 - [Pull Request Workflow for Docs](#pull-request-workflow-for-docs)
 - [Repository Structure](#repository-structure)
 - [Tooling Recommendations](#tooling-recommendations)
@@ -279,85 +285,360 @@ Markdown is a plain-text, open format readable by any editor. Moving away from C
 
 ---
 
-## Migration Approach
 
-### Migration Timeline
+---
 
-```mermaid
-gantt
-    title Confluence to GitHub Migration Timeline
-    dateFormat  YYYY-MM-DD
-    section Phase 1 — Foundation
-    Define repo structure & conventions     :p1a, 2026-04-06, 5d
-    Set up GitHub Actions pipeline          :p1b, after p1a, 3d
-    Configure MkDocs / static site          :p1c, after p1a, 4d
-    Create ADR template & guidelines        :p1d, after p1b, 2d
+## Automated Migration: Beautiful Soup + Kroki Pipeline
 
-    section Phase 2 — Pilot Migration
-    Migrate onboarding / runbook            :p2a, after p1d, 5d
-    Gather pilot team feedback              :p2b, after p2a, 3d
-    Refine tooling and templates            :p2c, after p2b, 2d
+This section describes a fully automated approach to extract, parse, convert, and render Confluence content into clean GitHub Markdown. It uses two primary tools:
 
-    section Phase 3 — Full Migration
-    Export all Confluence spaces            :p3a, after p2c, 5d
-    Review and clean exported content       :p3b, after p3a, 7d
-    Archive Confluence (read-only)          :p3c, after p3b, 2d
-    Stakeholder communication               :p3d, after p3b, 3d
+- **[Beautiful Soup 4](https://www.crummy.com/software/BeautifulSoup/)** — A Python library that parses Confluence's HTML output (from the REST API or a raw export) and transforms it into structured Markdown.
+- **[Kroki](https://kroki.io/)** — A unified HTTP API that renders 20+ text-based diagram types (PlantUML, Mermaid, GraphViz, D2, and more) to PNG or SVG without local tool installation.
 
-    section Phase 4 — Decommission
-    90-day parallel run                     :p4a, after p3d, 30d
-    Disable Confluence write access         :p4b, after p4a, 1d
-    Cancel Confluence subscription          :p4c, after p4b, 1d
-    Redirect Confluence URLs                :p4d, after p4b, 2d
-```
+---
 
-### Migration Workflow
+### Pipeline Architecture
+
+The diagram below shows the end-to-end automated migration pipeline:
 
 ```mermaid
-flowchart LR
-    A([Start]) --> B[Audit Confluence Spaces]
-    B --> C{Active or\nArchived?}
-    C -->|Active| D[Export to Markdown\nconfluence-to-markdown CLI]
-    C -->|Archived| E[Export to ZIP\nread-only archive]
-    D --> F[Review & Clean\nMarkdown Content]
-    F --> G[Add to GitHub\nRepository /docs]
-    G --> H[Raise Pull Request]
-    H --> I[Peer Review]
-    I --> J{Approved?}
-    J -->|Yes| K[Merge to main]
-    J -->|No| F
-    K --> L[GitHub Actions\nPublish to Pages]
-    L --> M([Done])
-    E --> N[Store in GitHub\nArchive Repo]
-    N --> M
+flowchart TD
+    CF_API([Confluence REST API]) --> HTML[Raw HTML Page Content]
+    HTML --> BS[Beautiful Soup 4\nHTML Parser]
+    BS --> TABLES[Convert Tables → GFM Tables]
+    BS --> CODE[Extract Code Blocks]
+    BS --> DIAG[Extract Diagram Macros\nGliffy / PlantUML / draw.io]
+    BS --> TEXT[Convert Body Text → Markdown]
 
-    style A fill:#28a745,color:#fff
-    style M fill:#28a745,color:#fff
-    style J fill:#f6c90e,color:#000
-    style C fill:#f6c90e,color:#000
+    CODE --> MD_CODE[Fenced Code Blocks\nin Markdown]
+    TEXT --> MD_TEXT[Clean Markdown Body]
+    TABLES --> MD_TABLE[Markdown Tables]
+
+    DIAG --> KROKI_API([Kroki API\nhttp://localhost:8000])
+    KROKI_API --> IMG[Rendered PNG / SVG Image]
+    IMG --> GH_IMG[Image saved to\n/docs/images/]
+
+    MD_CODE --> FINAL[📄 Final .md File]
+    MD_TEXT --> FINAL
+    MD_TABLE --> FINAL
+    GH_IMG --> FINAL
+
+    FINAL --> GH_REPO([GitHub Repository\n/docs/ folder])
+    GH_REPO --> PR[Raise Pull Request]
+
+    style CF_API fill:#FF5630,color:#fff
+    style KROKI_API fill:#0052CC,color:#fff
+    style GH_REPO fill:#24292e,color:#fff
+    style FINAL fill:#28a745,color:#fff
+    style BS fill:#f6c90e,color:#000
 ```
 
-### Phase 1 — Foundation (Weeks 1–2)
-- Define repository structure and folder conventions.
-- Set up GitHub Actions pipeline for linting and publishing.
-- Select and configure a static site generator (MkDocs Material recommended for enterprise use).
-- Create ADR template and contribution guidelines.
+---
 
-### Phase 2 — Pilot Migration (Weeks 3–4)
-- Migrate one high-traffic documentation area (e.g., onboarding guide or a core service's runbook).
-- Gather feedback from pilot team.
-- Refine tooling and templates.
+### Diagram Rendering Tools Comparison
 
-### Phase 3 — Full Migration (Weeks 5–8)
-- Export all active Confluence spaces to Markdown using automated tooling.
-- Review and clean up exported content.
-- Archive Confluence spaces (read-only) to preserve historical access during transition.
-- Communicate to all stakeholders.
+Kroki is the recommended tool because it covers the widest range of diagram types through a single consistent API. The table below compares it with alternatives:
 
-### Phase 4 — Decommission (After 90-day parallel run)
-- Disable Confluence write access.
-- Cancel Confluence subscription.
-- Redirect Confluence URLs to the new documentation site.
+| Tool | Diagram Types Supported | Output Formats | Deployment | Best For |
+|------|------------------------|----------------|------------|----------|
+| **Kroki** | 20+ (PlantUML, Mermaid, GraphViz, D2, Structurizr, Excalidraw, …) | PNG, SVG | Docker (self-hosted) or `kroki.io` | Universal: handles any legacy diagram format from Confluence |
+| **Mermaid CLI** | Mermaid only | PNG, SVG, PDF | Node.js CLI (`@mermaid-js/mermaid-cli`) | Diagrams already written in Mermaid syntax |
+| **PlantUML CLI** | PlantUML only | PNG, SVG, ASCII | Java CLI or Docker | Teams with heavy UML-based legacy diagrams |
+| **D2** | D2 language only | PNG, SVG | Go binary | Modern infrastructure / architecture diagrams |
+| **draw.io CLI** | draw.io / Gliffy XML | PNG, SVG, PDF | Node.js CLI (`draw.io --export`) | Confluence pages with embedded Gliffy or draw.io diagrams |
+
+> **Recommendation:** Deploy Kroki as a Docker container in your CI environment. It accepts any diagram syntax via HTTP POST and returns a rendered image — no per-diagram tool installation required.
+
+---
+
+### Python Migration Script
+
+The script below automates the entire pipeline: it fetches a Confluence space via the REST API, parses the HTML with Beautiful Soup, converts it to Markdown, extracts embedded diagram macros, renders them via Kroki, and writes the output to a local `/docs` folder ready to commit to GitHub.
+
+```python
+"""
+confluence_to_github.py
+
+Automated Confluence → GitHub Markdown migration pipeline.
+Requirements:
+    pip install requests beautifulsoup4 markdownify python-dotenv
+
+Environment variables (.env):
+    CONFLUENCE_BASE_URL  = https://your-org.atlassian.net
+    CONFLUENCE_API_TOKEN = <Atlassian API token>
+    CONFLUENCE_EMAIL     = your-email@example.com
+    CONFLUENCE_SPACE_KEY = ENG
+    KROKI_BASE_URL       = http://localhost:8000   # or https://kroki.io
+    OUTPUT_DIR           = ./docs
+"""
+
+import base64
+import os
+import re
+import zlib
+from pathlib import Path
+
+import requests
+from bs4 import BeautifulSoup
+from dotenv import load_dotenv
+from markdownify import markdownify as md
+
+load_dotenv()
+
+CONFLUENCE_BASE_URL = os.environ["CONFLUENCE_BASE_URL"]
+CONFLUENCE_EMAIL    = os.environ["CONFLUENCE_EMAIL"]
+CONFLUENCE_TOKEN    = os.environ["CONFLUENCE_API_TOKEN"]
+SPACE_KEY           = os.environ["CONFLUENCE_SPACE_KEY"]
+KROKI_BASE_URL      = os.getenv("KROKI_BASE_URL", "https://kroki.io")
+OUTPUT_DIR          = Path(os.getenv("OUTPUT_DIR", "./docs"))
+
+AUTH = (CONFLUENCE_EMAIL, CONFLUENCE_TOKEN)
+HEADERS = {"Accept": "application/json"}
+
+
+# ---------------------------------------------------------------------------
+# Confluence REST API helpers
+# ---------------------------------------------------------------------------
+
+def fetch_all_pages(space_key: str) -> list[dict]:
+    """Return all pages in a Confluence space (handles pagination)."""
+    pages, start, limit = [], 0, 50
+    while True:
+        url = (
+            f"{CONFLUENCE_BASE_URL}/wiki/rest/api/content"
+            f"?spaceKey={space_key}&type=page&expand=body.storage"
+            f"&start={start}&limit={limit}"
+        )
+        resp = requests.get(url, auth=AUTH, headers=HEADERS, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+        pages.extend(data["results"])
+        if data["start"] + data["limit"] >= data["size"]:
+            break
+        start += limit
+    return pages
+
+
+# ---------------------------------------------------------------------------
+# Diagram rendering via Kroki
+# ---------------------------------------------------------------------------
+
+def render_diagram_kroki(
+    diagram_type: str, source: str, output_path: Path, fmt: str = "svg"
+) -> str:
+    """POST diagram source to Kroki and save the rendered image.
+
+    Returns the relative Markdown image reference string.
+    """
+    # Kroki encodes payloads as deflate-compressed, base64url-encoded strings
+    compressed = zlib.compress(source.encode("utf-8"), 9)
+    encoded = base64.urlsafe_b64encode(compressed).decode("ascii")
+    url = f"{KROKI_BASE_URL}/{diagram_type}/{fmt}/{encoded}"
+
+    resp = requests.get(url, timeout=30)
+    resp.raise_for_status()
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_bytes(resp.content)
+    return str(output_path)
+
+
+# ---------------------------------------------------------------------------
+# Beautiful Soup: extract and replace diagram macros
+# ---------------------------------------------------------------------------
+
+CONFLUENCE_MACRO_TO_KROKI: dict[str, str] = {
+    "plantuml"     : "plantuml",
+    "graphviz"     : "graphviz",
+    "mermaid"      : "mermaid",
+    "sequence"     : "plantuml",  # Confluence sequence macro → PlantUML
+    "structurizr"  : "structurizr",
+}
+
+
+def extract_diagrams(soup: BeautifulSoup, image_dir: Path, page_slug: str) -> None:
+    """Find Confluence diagram macros, render them via Kroki in-place."""
+    for idx, macro in enumerate(
+        soup.find_all("ac:structured-macro")
+    ):
+        macro_name = macro.get("ac:name", "").lower()
+        kroki_type = CONFLUENCE_MACRO_TO_KROKI.get(macro_name)
+        if not kroki_type:
+            continue
+
+        body = macro.find("ac:plain-text-body")
+        if not body:
+            continue
+
+        diagram_source = body.get_text()
+        img_filename = f"{page_slug}-diagram-{idx + 1}.svg"
+        img_path = image_dir / img_filename
+
+        try:
+            render_diagram_kroki(kroki_type, diagram_source, img_path)
+            # Replace the macro tag with an <img> so markdownify converts it
+            img_tag = soup.new_tag(
+                "img",
+                src=f"images/{img_filename}",
+                alt=f"Diagram {idx + 1}",
+            )
+            macro.replace_with(img_tag)
+            print(f"  [DIAGRAM] Rendered {macro_name} → {img_filename}")
+        except requests.RequestException as exc:
+            print(f"  [WARN] Kroki rendering failed for {macro_name}: {exc}")
+            macro.decompose()  # Remove unrenderable macros rather than leaving raw XML
+
+
+# ---------------------------------------------------------------------------
+# HTML → Markdown conversion
+# ---------------------------------------------------------------------------
+
+def confluence_html_to_markdown(html: str, image_dir: Path, page_slug: str) -> str:
+    """Parse Confluence storage-format HTML and return clean GitHub Markdown."""
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Render diagrams first so their <img> replacements are picked up by markdownify
+    extract_diagrams(soup, image_dir, page_slug)
+
+    # Remove Confluence-specific layout tags that have no Markdown equivalent
+    for tag in soup.find_all(["ac:layout", "ac:layout-section", "ac:layout-cell"]):
+        tag.unwrap()
+
+    # Convert to Markdown using markdownify (handles tables, headings, code blocks)
+    markdown_content = md(
+        str(soup),
+        heading_style="ATX",       # Use # headings
+        bullets="-",               # Use - for unordered lists
+        code_language=""          # Preserve code block language hints
+    )
+
+    # Normalise excessive blank lines left by macro removal
+    markdown_content = re.sub(r"\n{3,}", "\n\n", markdown_content)
+    return markdown_content.strip()
+
+
+# ---------------------------------------------------------------------------
+# Slug and filename helpers
+# ---------------------------------------------------------------------------
+
+def slugify(title: str) -> str:
+    """Convert a page title to a URL/filename-safe slug."""
+    slug = title.lower()
+    slug = re.sub(r"[^\w\s-]", "", slug)
+    slug = re.sub(r"[\s_]+", "-", slug).strip("-")
+    return slug
+
+
+# ---------------------------------------------------------------------------
+# Main migration entry point
+# ---------------------------------------------------------------------------
+
+def migrate_space(space_key: str) -> None:
+    """Migrate all pages in a Confluence space to Markdown files."""
+    print(f"Fetching pages from Confluence space: {space_key}")
+    pages = fetch_all_pages(space_key)
+    print(f"Found {len(pages)} pages.")
+
+    image_dir = OUTPUT_DIR / "images"
+    image_dir.mkdir(parents=True, exist_ok=True)
+
+    for page in pages:
+        title = page["title"]
+        slug  = slugify(title)
+        html  = page["body"]["storage"]["value"]
+
+        print(f"\nConverting: {title}")
+        markdown = confluence_html_to_markdown(html, image_dir, slug)
+
+        # Prepend a YAML front matter block for MkDocs / static-site generators
+        front_matter = f"---\ntitle: \"{title}\"\n---\n\n"
+        output_file = OUTPUT_DIR / f"{slug}.md"
+        output_file.write_text(front_matter + markdown, encoding="utf-8")
+        print(f"  Written → {output_file}")
+
+    print(f"\nMigration complete. {len(pages)} pages written to {OUTPUT_DIR}/")
+
+
+if __name__ == "__main__":
+    migrate_space(SPACE_KEY)
+```
+
+---
+
+### Kroki Self-Hosted Setup
+
+For air-gapped or regulated environments, run Kroki as a local Docker container so no diagram source leaves your network:
+
+```yaml
+# docker-compose.kroki.yml
+services:
+  kroki:
+    image: yuzutech/kroki:latest
+    ports:
+      - "8000:8000"
+    environment:
+      KROKI_BLOCKDIAG_HOST: blockdiag
+      KROKI_MERMAID_HOST: mermaid
+      KROKI_BPMN_HOST: bpmn
+      KROKI_EXCALIDRAW_HOST: excalidraw
+
+  blockdiag:
+    image: yuzutech/kroki-blockdiag:latest
+
+  mermaid:
+    image: yuzutech/kroki-mermaid:latest
+
+  bpmn:
+    image: yuzutech/kroki-bpmn:latest
+
+  excalidraw:
+    image: yuzutech/kroki-excalidraw:latest
+```
+
+Start the stack with:
+
+```bash
+docker compose -f docker-compose.kroki.yml up -d
+```
+
+Then set `KROKI_BASE_URL=http://localhost:8000` in your `.env` file before running the migration script.
+
+---
+
+### Running the Pipeline
+
+End-to-end execution steps:
+
+```bash
+# 1. Install Python dependencies
+pip install requests beautifulsoup4 markdownify python-dotenv
+
+# 2. (Optional) Start local Kroki if not using kroki.io
+docker compose -f docker-compose.kroki.yml up -d
+
+# 3. Create .env with your Confluence credentials
+cat > .env <<EOF
+CONFLUENCE_BASE_URL=https://your-org.atlassian.net
+CONFLUENCE_EMAIL=you@example.com
+CONFLUENCE_API_TOKEN=<your-atlassian-api-token>
+CONFLUENCE_SPACE_KEY=ENG
+KROKI_BASE_URL=http://localhost:8000
+OUTPUT_DIR=./docs
+EOF
+
+# 4. Run the migration
+python confluence_to_github.py
+
+# 5. Review output, then commit to GitHub
+cd docs
+git init
+git add .
+git commit -m "docs: automated migration from Confluence space ENG"
+git remote add origin https://github.com/trravindra/Migration.git
+git push -u origin main
+```
+
+> **Security note:** Store your Atlassian API token in a secrets manager or CI secret — never commit the `.env` file. Add `.env` to `.gitignore` before the first commit.
 
 ---
 
@@ -440,8 +721,11 @@ graph TD
 | CI/CD | GitHub Actions |
 | Link checking | `lychee` or `markdown-link-check` |
 | Spell checking | `cspell` |
-| Export/migration | `confluence-to-markdown` CLI |
-| Diagrams | Mermaid (renders natively in GitHub Markdown) |
+| Export/migration | `confluence-to-markdown` CLI or custom Beautiful Soup pipeline |
+| HTML parsing & conversion | Beautiful Soup 4 + `markdownify` (Python) |
+| Diagram rendering (all types) | Kroki (self-hosted Docker or `kroki.io`) |
+| Diagram rendering (Mermaid only) | Mermaid CLI (`@mermaid-js/mermaid-cli`) |
+| Diagrams in GitHub Markdown | Mermaid (renders natively in GitHub Markdown) |
 
 ---
 
@@ -499,7 +783,7 @@ git commit -m "docs: add Confluence to GitHub migration proposal"
 #### Step 3 — Push to GitHub
 
 ```bash
-git remote add origin https://github.com/<your-org>/<your-repo>.git
+git remote add origin https://github.com/trravindra/Migration.git
 git branch -M main
 git push -u origin main
 ```
@@ -509,7 +793,7 @@ git push -u origin main
 Once pushed, navigate to the file in your browser:
 
 ```
-https://github.com/<your-org>/<your-repo>/blob/main/confluence-to-github-migration-proposal.md
+https://github.com/trravindra/Migration/blob/main/confluence-to-github-migration-proposal.md
 ```
 
 Share this URL with the Architecture Board. They will see the full rendered document — badges, all Mermaid UML diagrams, Gantt chart, sequence diagram, mind map, pie chart, and tables — directly in the browser without installing anything.
