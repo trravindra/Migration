@@ -153,13 +153,10 @@ The tables below provide a balanced view of the migration. The advantages decisi
 | 6 | **Offline access** | A `git clone` gives engineers full documentation access without a VPN or network connection. |
 | 7 | **Open, portable format** | Plain Markdown files are readable in any editor and carry no vendor lock-in. |
 | 8 | **Native Mermaid diagrams** | GitHub renders Mermaid diagrams natively in the browser at no cost, replacing paid Confluence diagram macros. |
-| 9 | **Unified search** | Engineers search one place — GitHub — for both code and documentation, reducing context switching. |
-| 10 | **ADR traceability** | Architecture Decision Records link directly to the commits and PRs that implemented each decision. |
-| 11 | **Granular access control** | GitHub Teams and repository visibility settings provide fine-grained RBAC equivalent to or better than Confluence spaces. |
-| 12 | **Automated publishing** | GitHub Pages or MkDocs publishes a fully searchable, versioned static site with every merge to `main`. |
-| 13 | **Inner-source contribution model** | Any engineer can fork, raise a PR, and contribute documentation improvements using familiar workflows. |
-| 14 | **Signed commits and audit trail** | `git log` provides a tamper-evident history of every documentation change, satisfying compliance requirements. |
-| 15 | **Consistent developer tooling** | VS Code, GitHub Copilot, and all standard dev tools work natively with Markdown, lowering the barrier to contribution. |
+| 9 | **Unified search** |  search one place — GitHub — for both code and documentation, reducing context switching. |
+| 10 | **Inner-source contribution model** | Any engineer can fork, raise a PR, and contribute documentation improvements using familiar workflows. |
+| 11 | **Signed commits and audit trail** | `git log` provides a tamper-evident history of every documentation change, satisfying compliance requirements. |
+| 12 | **Consistent developer tooling** | VS Code, GitHub Copilot, and all standard dev tools work natively with Markdown, lowering the barrier to contribution. |
 
 ### ⚠️ Cons / Considerations
 
