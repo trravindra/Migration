@@ -139,27 +139,39 @@ Move all documentation into Markdown files stored within GitHub repositories, fo
 
 ## Pros and Cons
 
-The table below provides a balanced view of the migration. The advantages decisively outweigh the drawbacks, particularly given that GitHub is already licensed and used daily by every engineer.
+The tables below provide a balanced view of the migration. The advantages decisively outweigh the drawbacks, particularly given that GitHub is already licensed and used daily by every engineer.
 
-| # | Pros (GitHub) | # | Cons / Considerations |
-|---|---------------|---|------------------------|
-| 1 | **Docs next to code** — documentation and code changes ship in the same pull request, eliminating drift | 1 | **Markdown learning curve** — non-technical writers unfamiliar with Markdown need a short onboarding session |
-| 2 | **Full Git history** — every change is versioned with author, timestamp, and commit message; complete audit trail out of the box | 2 | **Loss of Confluence macros** — rich macros (status, roadmap, inline tasks) have no 1-to-1 Markdown equivalent |
-| 3 | **Pull request review** — documentation goes through the same PR approval workflow as code, enforcing quality and governance | 3 | **One-time migration effort** — existing Confluence pages require export, conversion, and review (mitigated by the automated pipeline) |
-| 4 | **Native CI/CD** — GitHub Actions lints, spell-checks, and link-checks every Markdown file before merge | 4 | **No native inline page comments** — Confluence supports inline paragraph comments; GitHub requires Discussions or PR comments as an alternative |
-| 5 | **Zero additional licence cost** — GitHub is already licensed across the organisation; Confluence's per-seat fee is eliminated entirely | 5 | **PR workflow familiarity required** — contributors must be comfortable with branching and pull requests, which some stakeholders may not be |
-| 6 | **Offline access** — a `git clone` gives engineers full documentation access without a VPN or network connection | | |
-| 7 | **Open, portable format** — plain Markdown files are readable in any editor and not locked to a proprietary storage format | | |
-| 8 | **Native Mermaid diagrams** — GitHub renders Mermaid diagrams natively in the browser at no cost, replacing paid Confluence diagram macros | | |
-| 9 | **Unified search** — engineers search one place (GitHub) for both code and documentation, reducing context switching | | |
-| 10 | **ADR traceability** — Architecture Decision Records link directly to the commits and PRs that implemented each decision | | |
-| 11 | **Granular access control** — GitHub Teams and repository visibility settings provide fine-grained RBAC equivalent to or better than Confluence spaces | | |
-| 12 | **Automated publishing** — GitHub Pages or MkDocs publishes a fully searchable, versioned static site with every merge to `main` | | |
-| 13 | **Inner-source contribution model** — any engineer can fork, raise a PR, and contribute documentation improvements using familiar workflows | | |
-| 14 | **Signed commits and audit trail** — git log provides a tamper-evident history of every documentation change, satisfying compliance requirements | | |
-| 15 | **Consistent developer tooling** — VS Code, GitHub Copilot, and all standard dev tools work natively with Markdown, lowering the barrier to contribution | | |
+### ✅ Pros — Migrating to GitHub
 
-> **Summary:** 15 significant advantages versus 5 manageable, time-limited drawbacks — all of which have clear mitigations outlined in the [Risk Analysis](#risk-analysis) section.
+| # | Topic | Detail |
+|---|-------|--------|
+| 1 | **Docs next to code** | Documentation and code changes ship in the same pull request, eliminating drift between the two. |
+| 2 | **Full Git history** | Every change is versioned with author, timestamp, and commit message — a complete, tamper-evident audit trail. |
+| 3 | **Pull request review** | Documentation goes through the same PR approval workflow as code, enforcing quality gates and governance. |
+| 4 | **Native CI/CD** | GitHub Actions lints, spell-checks, and link-checks every Markdown file automatically before merge. |
+| 5 | **Zero additional licence cost** | GitHub is already licensed across the organisation; Confluence's per-seat fee is eliminated entirely. |
+| 6 | **Offline access** | A `git clone` gives engineers full documentation access without a VPN or network connection. |
+| 7 | **Open, portable format** | Plain Markdown files are readable in any editor and carry no vendor lock-in. |
+| 8 | **Native Mermaid diagrams** | GitHub renders Mermaid diagrams natively in the browser at no cost, replacing paid Confluence diagram macros. |
+| 9 | **Unified search** | Engineers search one place — GitHub — for both code and documentation, reducing context switching. |
+| 10 | **ADR traceability** | Architecture Decision Records link directly to the commits and PRs that implemented each decision. |
+| 11 | **Granular access control** | GitHub Teams and repository visibility settings provide fine-grained RBAC equivalent to or better than Confluence spaces. |
+| 12 | **Automated publishing** | GitHub Pages or MkDocs publishes a fully searchable, versioned static site with every merge to `main`. |
+| 13 | **Inner-source contribution model** | Any engineer can fork, raise a PR, and contribute documentation improvements using familiar workflows. |
+| 14 | **Signed commits and audit trail** | `git log` provides a tamper-evident history of every documentation change, satisfying compliance requirements. |
+| 15 | **Consistent developer tooling** | VS Code, GitHub Copilot, and all standard dev tools work natively with Markdown, lowering the barrier to contribution. |
+
+### ⚠️ Cons / Considerations
+
+| # | Topic | Detail | Mitigation |
+|---|-------|--------|------------|
+| 1 | **Markdown learning curve** | Non-technical writers unfamiliar with Markdown need initial onboarding. | Short workshop + VS Code preview + GitHub Copilot assist eliminates most friction within days. |
+| 2 | **Loss of Confluence macros** | Rich macros (status badges, roadmap timelines, inline tasks) have no 1-to-1 Markdown equivalent. | GitHub Discussions covers inline Q&A; MkDocs plugins and shields.io badges replicate most visual macros. |
+| 3 | **One-time migration effort** | Existing Confluence pages require export, conversion, and review before cut-over. | The automated Beautiful Soup + Kroki pipeline in this proposal handles the bulk conversion with minimal manual effort. |
+| 4 | **No native inline page comments** | Confluence supports inline paragraph-level comments; GitHub does not replicate this outside of PRs. | GitHub Discussions threads can anchor to specific sections; PR comments serve this purpose during the review cycle. |
+| 5 | **PR workflow familiarity required** | Contributors must be comfortable with branching and pull requests, which some non-engineering stakeholders may not be. | Provide a one-page "Docs contribution guide" and pair non-technical authors with an engineer during the first few PRs. |
+
+> **Summary:** **15 significant advantages** versus **5 manageable, time-limited drawbacks** — all with clear mitigations. See the [Risk Analysis](#risk-analysis) section for full detail.
 
 ---
 
